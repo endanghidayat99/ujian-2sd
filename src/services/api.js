@@ -1,32 +1,21 @@
-const URL_KEY = 'ujian_sd_script_url'
-
-export function getScriptUrl() {
-  return localStorage.getItem(URL_KEY) || ''
-}
-
-export function setScriptUrl(url) {
-  if (url.trim()) localStorage.setItem(URL_KEY, url.trim())
-  else localStorage.removeItem(URL_KEY)
-}
+import { SCRIPT_URL } from '../config'
 
 export function hasScriptUrl() {
-  return !!getScriptUrl()
+  return !!SCRIPT_URL
 }
 
-// GET — fetch all questions from Sheets
+// GET — ambil semua soal dari Sheets
 export async function fetchAllQuestions() {
-  const url = getScriptUrl()
-  if (!url) return null
-  const res = await fetch(`${url}?action=getAllQuestions`)
+  if (!SCRIPT_URL) return null
+  const res = await fetch(`${SCRIPT_URL}?action=getAllQuestions`)
   const json = await res.json()
   return json.ok ? json.data : null
 }
 
-// POST — push one subject's questions to Sheets
+// POST — push soal satu subject ke Sheets
 export async function syncQuestionsToSheet(subjectId, questions) {
-  const url = getScriptUrl()
-  if (!url) throw new Error('URL belum dikonfigurasi')
-  const res = await fetch(url, {
+  if (!SCRIPT_URL) throw new Error('SCRIPT_URL belum diisi di src/config.js')
+  const res = await fetch(SCRIPT_URL, {
     method: 'POST',
     body: JSON.stringify({ action: 'updateQuestions', subjectId, questions }),
   })
@@ -35,21 +24,20 @@ export async function syncQuestionsToSheet(subjectId, questions) {
   return json.data
 }
 
-// POST — save score (fire and forget)
+// POST — simpan nilai (fire and forget)
 export function saveScoreToSheet(record) {
-  const url = getScriptUrl()
-  if (!url) return
-  fetch(url, {
+  if (!SCRIPT_URL) return
+  fetch(SCRIPT_URL, {
     method: 'POST',
     body: JSON.stringify({ action: 'saveScore', ...record }),
   }).catch(() => {})
 }
 
-// GET — test connection
+// GET — test koneksi
 export async function testConnection() {
-  const url = getScriptUrl()
-  if (!url) throw new Error('URL kosong')
-  const res = await fetch(`${url}?action=ping`)
+  if (!SCRIPT_URL) throw new Error('SCRIPT_URL belum diisi di src/config.js')
+  const res = await fetch(`${SCRIPT_URL}?action=ping`)
   const json = await res.json()
-  return json.ok
+  if (!json.ok) throw new Error('Respons tidak valid')
+  return true
 }

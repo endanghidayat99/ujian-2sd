@@ -7,7 +7,7 @@
         <v-btn icon variant="text" color="white" @click="router.push({ name: 'home' })">
           <v-icon>mdi-arrow-left</v-icon>
         </v-btn>
-        <div>
+        <div style="flex: 1;">
           <h1 class="font-fredoka text-white" style="font-size: 1.8rem; line-height: 1.1;">
             Pemeliharaan Soal
           </h1>
@@ -15,107 +15,67 @@
             Kelola soal ujian per mata pelajaran
           </p>
         </div>
+        <!-- Sheets status badge -->
+        <div v-if="hasScriptUrl()" class="d-flex align-center" style="gap: 8px;">
+          <v-chip
+            :color="qStore.error ? 'error' : 'success'"
+            variant="flat"
+            size="small"
+            :prepend-icon="qStore.error ? 'mdi-cloud-off-outline' : 'mdi-google-spreadsheet'"
+          >
+            {{ qStore.error ? 'Offline' : 'Google Sheets' }}
+          </v-chip>
+          <v-btn
+            icon
+            variant="text"
+            color="white"
+            size="small"
+            :loading="qStore.loading"
+            title="Refresh dari Sheets"
+            @click="reload"
+          >
+            <v-icon>mdi-refresh</v-icon>
+          </v-btn>
+        </div>
       </div>
 
-      <!-- Google Sheets Settings Card -->
-      <v-card rounded="xl" elevation="4" class="mb-5">
-        <v-card-title
-          class="pa-4 pb-2 d-flex align-center justify-space-between"
-          style="cursor: pointer;"
-          @click="showSettings = !showSettings"
-        >
-          <div class="d-flex align-center" style="gap: 8px;">
-            <v-icon color="success">mdi-google-spreadsheet</v-icon>
-            <span class="font-fredoka" style="font-size: 1rem; color: #2e7d32;">
-              Integrasi Google Sheets
-            </span>
-            <v-chip v-if="isConnected" size="x-small" color="success" variant="flat">Terhubung</v-chip>
-            <v-chip v-else size="x-small" color="grey" variant="outlined">Belum dikonfigurasi</v-chip>
-          </div>
-          <v-icon>{{ showSettings ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-        </v-card-title>
-
-        <v-expand-transition>
-          <div v-if="showSettings">
-            <v-divider />
-            <v-card-text class="pa-4">
-              <p style="font-size: 0.85rem; color: #555; font-family: 'Nunito', sans-serif;" class="mb-3">
-                Paste URL Google Apps Script Web App di bawah ini. Soal dan nilai akan tersimpan di Google Sheets Anda.
-              </p>
-              <div class="d-flex align-center" style="gap: 8px;">
-                <v-text-field
-                  v-model="scriptUrlInput"
-                  label="URL Google Apps Script"
-                  placeholder="https://script.google.com/macros/s/..."
-                  variant="outlined"
-                  density="compact"
-                  rounded="lg"
-                  hide-details
-                  style="flex: 1;"
-                  prepend-inner-icon="mdi-link"
-                />
-                <v-btn color="primary" variant="flat" rounded="xl" @click="saveUrl">Simpan</v-btn>
-                <v-btn
-                  v-if="isConnected"
-                  color="teal"
-                  variant="outlined"
-                  rounded="xl"
-                  :loading="testing"
-                  @click="testConn"
-                >
-                  Test
-                </v-btn>
-              </div>
-              <v-alert v-if="connAlert.show" :type="connAlert.type" density="compact" class="mt-3" rounded="lg">
-                {{ connAlert.message }}
-              </v-alert>
-              <div v-if="isConnected" class="d-flex flex-wrap mt-4" style="gap: 10px;">
-                <v-btn
-                  color="success"
-                  variant="flat"
-                  size="small"
-                  rounded="xl"
-                  prepend-icon="mdi-cloud-download"
-                  :loading="qStore.syncing"
-                  @click="fetchFromSheets"
-                >
-                  Ambil Semua Soal dari Sheets
-                </v-btn>
-                <div v-if="qStore.lastSyncAt" style="font-size: 0.78rem; color: #888; font-family: 'Nunito', sans-serif; align-self: center;">
-                  Terakhir sync: {{ qStore.lastSyncAt }}
-                </div>
-              </div>
-
-              <!-- Cara Setup -->
-              <v-expansion-panels class="mt-4" variant="accordion">
-                <v-expansion-panel rounded="lg">
-                  <v-expansion-panel-title style="font-size: 0.85rem; font-family: 'Nunito', sans-serif; font-weight: 700;">
-                    📋 Cara setup Google Apps Script
-                  </v-expansion-panel-title>
-                  <v-expansion-panel-text>
-                    <div style="font-size: 0.82rem; font-family: 'Nunito', sans-serif; color: #444; line-height: 1.7;">
-                      <ol style="padding-left: 18px; margin: 0;">
-                        <li>Buka <strong>Google Sheets</strong> baru, beri nama "Ujian SD"</li>
-                        <li>Klik menu <strong>Extensions → Apps Script</strong></li>
-                        <li>Hapus kode default, paste kode Apps Script dari panduan</li>
-                        <li>Klik <strong>Deploy → New deployment</strong></li>
-                        <li>Pilih type: <strong>Web app</strong></li>
-                        <li>Execute as: <strong>Me</strong>, Who has access: <strong>Anyone</strong></li>
-                        <li>Klik Deploy, copy URL yang muncul</li>
-                        <li>Paste URL di kolom atas dan klik Simpan</li>
-                      </ol>
-                      <v-btn class="mt-3" size="small" color="primary" variant="outlined" rounded="xl" prepend-icon="mdi-content-copy" @click="copyScriptCode">
-                        Salin Kode Apps Script
-                      </v-btn>
-                    </div>
-                  </v-expansion-panel-text>
-                </v-expansion-panel>
-              </v-expansion-panels>
-
-            </v-card-text>
-          </div>
-        </v-expand-transition>
+      <!-- Loading overlay -->
+      <v-card v-if="qStore.loading" rounded="xl" class="mb-4 pa-6 text-center" elevation="3">
+        <v-progress-circular indeterminate color="primary" size="40" class="mb-3" />
+        <p style="font-family: 'Nunito', sans-serif; color: #666; margin: 0;">
+          Memuat soal dari Google Sheets...
+        </p>
       </v-card>
+
+      <!-- Error banner -->
+      <v-alert
+        v-if="qStore.error && !qStore.loading"
+        type="warning"
+        rounded="xl"
+        density="compact"
+        class="mb-4"
+        closable
+      >
+        Gagal memuat dari Google Sheets: {{ qStore.error }}. Menampilkan data cache/default.
+      </v-alert>
+
+      <!-- No URL configured notice -->
+      <v-alert
+        v-if="!hasScriptUrl()"
+        type="info"
+        rounded="xl"
+        density="compact"
+        class="mb-4"
+        icon="mdi-information-outline"
+      >
+        Google Sheets belum dikonfigurasi. Isi <code>SCRIPT_URL</code> di <strong>src/config.js</strong> lalu build ulang.
+        Soal saat ini tersimpan secara lokal.
+      </v-alert>
+
+      <!-- Last sync info -->
+      <div v-if="qStore.lastSyncAt && !qStore.loading" class="mb-3" style="font-size: 0.8rem; color: rgba(255,255,255,0.7); font-family: 'Nunito', sans-serif; text-align: right;">
+        Terakhir sync dari Sheets: {{ qStore.lastSyncAt }}
+      </div>
 
       <!-- Subject Tabs -->
       <v-card rounded="xl" elevation="4" class="mb-4">
@@ -128,7 +88,6 @@
           >
             <span class="mr-1">{{ subject.icon }}</span>
             {{ subject.name }}
-            <v-chip v-if="qStore.hasCustom(subject.id)" size="x-small" color="orange" class="ml-2">custom</v-chip>
           </v-tab>
         </v-tabs>
       </v-card>
@@ -142,15 +101,10 @@
             <v-card rounded="xl" elevation="3" class="mb-4">
               <v-card-text class="pa-4">
                 <div class="d-flex flex-wrap align-center" style="gap: 10px;">
-                  <div class="d-flex align-center" style="gap: 8px; flex: 1; min-width: 160px;">
-                    <v-chip :color="subject.color" variant="flat" size="small" style="color: white;">
-                      {{ activeQuestions.length }} soal
-                    </v-chip>
-                    <span v-if="qStore.hasCustom(subject.id)" style="font-size: 0.78rem; color: #f57c00; font-family: 'Nunito', sans-serif; font-weight: 700;">
-                      ✏️ Dimodifikasi
-                    </span>
-                  </div>
-                  <div class="d-flex flex-wrap" style="gap: 8px;">
+                  <v-chip :color="subject.color" variant="flat" size="small" style="color: white;">
+                    {{ activeQuestions.length }} soal
+                  </v-chip>
+                  <div class="d-flex flex-wrap" style="gap: 8px; margin-left: auto;">
                     <v-btn size="small" color="success" variant="flat" rounded="xl" prepend-icon="mdi-plus" @click="openAddDialog">
                       Tambah Soal
                     </v-btn>
@@ -161,7 +115,7 @@
                       Export Excel
                     </v-btn>
                     <v-btn
-                      v-if="isConnected"
+                      v-if="hasScriptUrl()"
                       size="small"
                       color="green-darken-2"
                       variant="outlined"
@@ -380,7 +334,7 @@
                       <tr><td><strong>Jawaban</strong></td><td>A, B, C, atau D</td></tr>
                     </tbody>
                   </v-table>
-                  <p class="mt-2">Gunakan tombol <strong>Export Excel</strong> untuk mendapatkan template.</p>
+                  <p class="mt-2">Gunakan <strong>Export Excel</strong> untuk mendapatkan template.</p>
                 </div>
               </v-expansion-panel-text>
             </v-expansion-panel>
@@ -408,7 +362,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { subjects } from '../data/index'
 import { useQuestionsStore } from '../stores/questions'
-import { getScriptUrl, setScriptUrl, hasScriptUrl, testConnection } from '../services/api'
+import { hasScriptUrl } from '../services/api'
 import * as XLSX from 'xlsx'
 
 const router = useRouter()
@@ -416,156 +370,30 @@ const qStore = useQuestionsStore()
 
 const activeTab = ref(subjects[0]?.id)
 const fileInput = ref(null)
-const showSettings = ref(!hasScriptUrl())
 
-// ─── Google Sheets settings ────────────────────────────────────────────────
-const scriptUrlInput = ref(getScriptUrl())
-const isConnected = ref(hasScriptUrl())
-const testing = ref(false)
-const connAlert = ref({ show: false, type: 'success', message: '' })
-
-function saveUrl() {
-  setScriptUrl(scriptUrlInput.value)
-  isConnected.value = hasScriptUrl()
-  connAlert.value = { show: true, type: 'success', message: 'URL disimpan.' }
-  setTimeout(() => { connAlert.value.show = false }, 2000)
-}
-
-async function testConn() {
-  testing.value = true
-  connAlert.value.show = false
-  try {
-    await testConnection()
-    connAlert.value = { show: true, type: 'success', message: 'Koneksi berhasil! Apps Script berjalan normal.' }
-  } catch (e) {
-    connAlert.value = { show: true, type: 'error', message: `Gagal terhubung: ${e.message}` }
-  } finally {
-    testing.value = false
-  }
-}
-
-async function fetchFromSheets() {
-  try {
+// Auto-fetch dari Sheets setiap kali halaman dibuka
+onMounted(async () => {
+  if (hasScriptUrl()) {
     const result = await qStore.fetchFromSheets()
-    if (result) showSnack(`✅ Berhasil mengambil soal dari ${result.count} mata pelajaran`, 'success')
-    else showSnack('Tidak ada data soal di Google Sheets', 'warning')
-  } catch (e) {
-    showSnack(`Gagal: ${e.message}`, 'error')
+    if (result) showSnack(`Soal dimuat dari Google Sheets (${result.count} mata pelajaran)`, 'success')
+    else if (qStore.error) showSnack('Gagal memuat dari Sheets, menampilkan data cache.', 'warning')
   }
+})
+
+async function reload() {
+  const result = await qStore.fetchFromSheets()
+  if (result) showSnack('Soal berhasil diperbarui dari Google Sheets', 'success')
+  else if (qStore.error) showSnack(`Gagal: ${qStore.error}`, 'error')
+  else showSnack('Sheets kosong, menampilkan data default', 'info')
 }
 
 async function pushToSheets(subjectId) {
   try {
     await qStore.pushToSheets(subjectId)
-    showSnack('✅ Soal berhasil dikirim ke Google Sheets!', 'success')
+    showSnack('Soal berhasil dikirim ke Google Sheets!', 'success')
   } catch (e) {
     showSnack(`Gagal push: ${e.message}`, 'error')
   }
-}
-
-// ─── Apps Script source code ───────────────────────────────────────────────
-const APPS_SCRIPT_CODE = `// =============================================
-// Ujian SD — Google Apps Script Backend
-// Deploy sebagai Web App:
-//   Execute as: Me | Who has access: Anyone
-// =============================================
-
-const SOAL_SHEET = 'Soal'
-const NILAI_SHEET = 'Nilai'
-
-function getOrCreateSheet(name) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet()
-  return ss.getSheetByName(name) || ss.insertSheet(name)
-}
-
-function initHeaders() {
-  const soal = getOrCreateSheet(SOAL_SHEET)
-  if (soal.getLastRow() === 0) {
-    soal.appendRow(['subjectId','pertanyaan','pilihanA','pilihanB','pilihanC','pilihanD','jawaban'])
-    soal.getRange(1,1,1,7).setFontWeight('bold').setBackground('#4a90d9').setFontColor('white')
-  }
-  const nilai = getOrCreateSheet(NILAI_SHEET)
-  if (nilai.getLastRow() === 0) {
-    nilai.appendRow(['subjectId','skor','benar','salah','dilewati','tanggal'])
-    nilai.getRange(1,1,1,6).setFontWeight('bold').setBackground('#4a90d9').setFontColor('white')
-  }
-}
-
-function output(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON)
-}
-
-function doGet(e) {
-  try {
-    initHeaders()
-    const action = (e.parameter && e.parameter.action) || 'getAllQuestions'
-    if (action === 'ping') return output({ ok: true, message: 'pong' })
-    if (action === 'getAllQuestions') return output({ ok: true, data: getAllQuestions() })
-    if (action === 'getHistory') return output({ ok: true, data: getHistory() })
-    return output({ ok: false, error: 'Unknown action' })
-  } catch(err) { return output({ ok: false, error: err.toString() }) }
-}
-
-function doPost(e) {
-  try {
-    initHeaders()
-    const body = JSON.parse(e.postData.contents)
-    if (body.action === 'updateQuestions') return output({ ok: true, data: updateQuestions(body.subjectId, body.questions) })
-    if (body.action === 'saveScore') return output({ ok: true, data: saveScore(body) })
-    return output({ ok: false, error: 'Unknown action' })
-  } catch(err) { return output({ ok: false, error: err.toString() }) }
-}
-
-function getAllQuestions() {
-  const sheet = getOrCreateSheet(SOAL_SHEET)
-  const last = sheet.getLastRow()
-  if (last <= 1) return {}
-  const rows = sheet.getRange(2, 1, last - 1, 7).getValues()
-  const result = {}
-  rows.forEach(([subjectId, q, a, b, c, d, ans]) => {
-    if (!subjectId || !q) return
-    if (!result[subjectId]) result[subjectId] = []
-    const idx = ['A','B','C','D'].indexOf(String(ans).toUpperCase())
-    result[subjectId].push({ q: String(q), options: [String(a),String(b),String(c),String(d)], answer: idx >= 0 ? idx : 0 })
-  })
-  return result
-}
-
-function updateQuestions(subjectId, questions) {
-  const sheet = getOrCreateSheet(SOAL_SHEET)
-  const last = sheet.getLastRow()
-  if (last > 1) {
-    const ids = sheet.getRange(2, 1, last - 1, 1).getValues()
-    for (let i = ids.length - 1; i >= 0; i--) {
-      if (ids[i][0] === subjectId) sheet.deleteRow(i + 2)
-    }
-  }
-  if (questions.length > 0) {
-    const rows = questions.map(q => [subjectId, q.q, q.options[0]||'', q.options[1]||'', q.options[2]||'', q.options[3]||'', ['A','B','C','D'][q.answer]||'A'])
-    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 7).setValues(rows)
-  }
-  return { subjectId, count: questions.length }
-}
-
-function getHistory() {
-  const sheet = getOrCreateSheet(NILAI_SHEET)
-  const last = sheet.getLastRow()
-  if (last <= 1) return []
-  return sheet.getRange(2, 1, last - 1, 6).getValues().map(([s,sc,b,w,sk,d]) => ({
-    subjectId: String(s), score: Number(sc), correct: Number(b), wrong: Number(w), skipped: Number(sk), date: String(d)
-  }))
-}
-
-function saveScore(data) {
-  getOrCreateSheet(NILAI_SHEET).appendRow([data.subjectId||'', data.score||0, data.correct||0, data.wrong||0, data.skipped||0, data.date||new Date().toISOString()])
-  return { saved: true }
-}`
-
-function copyScriptCode() {
-  navigator.clipboard.writeText(APPS_SCRIPT_CODE)
-    .then(() => showSnack('Kode Apps Script disalin ke clipboard!', 'success'))
-    .catch(() => showSnack('Gagal menyalin. Coba manual.', 'error'))
 }
 
 // ─── Question list ─────────────────────────────────────────────────────────
@@ -611,7 +439,6 @@ function saveQuestion() {
 // ─── Delete ────────────────────────────────────────────────────────────────
 const showDeleteDialog = ref(false)
 const deleteIndex = ref(null)
-
 function confirmDelete(idx) { deleteIndex.value = idx; showDeleteDialog.value = true }
 function doDelete() {
   qStore.deleteQuestion(activeTab.value, deleteIndex.value)
@@ -622,7 +449,6 @@ function doDelete() {
 // ─── Reset ─────────────────────────────────────────────────────────────────
 const showResetDialog = ref(false)
 const resetSubjectId = ref(null)
-
 function confirmReset(id) { resetSubjectId.value = id; showResetDialog.value = true }
 function doReset() {
   qStore.resetToDefault(resetSubjectId.value)
