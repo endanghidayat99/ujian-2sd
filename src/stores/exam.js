@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getSubjectById } from '../data/index'
+import { useQuestionsStore } from './questions'
+import { saveScoreToSheet } from '../services/api'
 
 const STORAGE_KEY = 'ujian_sd_history'
 
@@ -40,8 +42,9 @@ export const useExamStore = defineStore('exam', () => {
   function startExam(subjectId) {
     const subject = getSubjectById(subjectId)
     if (!subject) return
+    const qStore = useQuestionsStore()
     currentSubjectId.value = subjectId
-    currentQuestions.value = [...subject.questions]
+    currentQuestions.value = [...qStore.getQuestions(subjectId)]
     currentQuestionIndex.value = 0
     answers.value = {}
   }
@@ -79,6 +82,7 @@ export const useExamStore = defineStore('exam', () => {
     }
     history.value.push(record)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history.value))
+    saveScoreToSheet(record) // fire-and-forget ke Google Sheets
     return record
   }
 

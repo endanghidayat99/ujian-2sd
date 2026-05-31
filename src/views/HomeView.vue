@@ -7,6 +7,18 @@
         <div class="hero-icon">🎒</div>
         <h1 class="font-fredoka hero-title text-white">Ujian SD Kelas 2</h1>
         <p class="hero-subtitle text-white">Semester 2 — Pilih Mata Pelajaran</p>
+        <v-btn
+          class="mt-4"
+          variant="outlined"
+          color="white"
+          rounded="xl"
+          size="small"
+          prepend-icon="mdi-cog-outline"
+          @click="router.push({ name: 'admin' })"
+          style="opacity: 0.85;"
+        >
+          Pemeliharaan Soal
+        </v-btn>
       </div>
 
       <!-- Subject Grid -->
