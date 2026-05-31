@@ -7,18 +7,39 @@
         <div class="hero-icon">🎒</div>
         <h1 class="font-fredoka hero-title text-white">Ujian SD Kelas 2</h1>
         <p class="hero-subtitle text-white">Semester 2 — Pilih Mata Pelajaran</p>
-        <v-btn
-          class="mt-4"
-          variant="outlined"
-          color="white"
-          rounded="xl"
-          size="small"
-          prepend-icon="mdi-cog-outline"
-          @click="router.push({ name: 'admin' })"
-          style="opacity: 0.85;"
-        >
-          Pemeliharaan Soal
-        </v-btn>
+
+        <!-- Admin buttons -->
+        <div class="d-flex justify-center flex-wrap mt-4" style="gap: 10px;">
+          <v-btn
+            variant="outlined"
+            color="white"
+            rounded="xl"
+            size="small"
+            prepend-icon="mdi-cog-outline"
+            style="opacity: 0.85;"
+            @click="showPasswordDialog = true"
+          >
+            Pemeliharaan Soal
+          </v-btn>
+          <v-btn
+            v-if="sheetsConfigured"
+            variant="outlined"
+            color="white"
+            rounded="xl"
+            size="small"
+            prepend-icon="mdi-google-spreadsheet"
+            style="opacity: 0.85;"
+            :loading="syncing"
+            @click="syncSoal"
+          >
+            Sync Soal
+          </v-btn>
+        </div>
+
+        <!-- Sync result -->
+        <p v-if="syncMsg" class="mt-2 text-white" style="font-size: 0.82rem; opacity: 0.85; font-family: 'Nunito', sans-serif;">
+          {{ syncMsg }}
+        </p>
       </div>
 
       <!-- Subject Grid -->
@@ -39,19 +60,13 @@
           <span class="font-fredoka" style="font-size: 1.3rem; color: #6C63FF;">
             📊 Rekap & Riwayat Nilai
           </span>
-          <v-btn
-            variant="text"
-            color="error"
-            size="small"
-            @click="showClearDialog = true"
-          >
+          <v-btn variant="text" color="error" size="small" @click="showClearDialog = true">
             <v-icon start size="16">mdi-trash-can-outline</v-icon>
             Hapus Riwayat
           </v-btn>
         </v-card-title>
 
         <v-card-text class="pa-5 pt-0">
-          <!-- Best Score per Subject -->
           <div class="best-scores-grid mb-5">
             <div
               v-for="subject in subjects"
@@ -70,14 +85,11 @@
               <div v-else class="best-score-empty">—</div>
             </div>
           </div>
-
-          <!-- Recent History -->
           <div class="section-label mb-3">🕐 Riwayat Terbaru</div>
           <HistoryList :items="enrichedHistory.slice().reverse().slice(0, 10)" />
         </v-card-text>
       </v-card>
 
-      <!-- Empty state -->
       <div v-else class="text-center mt-10">
         <div style="font-size: 2rem;">👆</div>
         <p class="text-white mt-2" style="opacity: 0.8; font-size: 0.95rem;">
@@ -87,7 +99,36 @@
 
     </v-container>
 
-    <!-- Clear Dialog -->
+    <!-- Password Dialog -->
+    <v-dialog v-model="showPasswordDialog" max-width="360" persistent>
+      <v-card rounded="xl">
+        <v-card-text class="pa-6 text-center">
+          <div style="font-size: 2.2rem;" class="mb-2">🔐</div>
+          <h3 class="font-fredoka mb-4" style="font-size: 1.15rem; color: #6C63FF;">
+            Masuk sebagai Admin
+          </h3>
+          <v-text-field
+            v-model="passwordInput"
+            label="Password"
+            :type="showPwd ? 'text' : 'password'"
+            :append-inner-icon="showPwd ? 'mdi-eye-off' : 'mdi-eye'"
+            variant="outlined"
+            density="compact"
+            rounded="lg"
+            autofocus
+            :error-messages="passwordError"
+            @click:append-inner="showPwd = !showPwd"
+            @keyup.enter="submitPassword"
+          />
+        </v-card-text>
+        <v-card-actions class="justify-center pa-4 pt-0" style="gap: 10px;">
+          <v-btn variant="outlined" rounded="xl" @click="closePasswordDialog">Batal</v-btn>
+          <v-btn color="primary" variant="flat" rounded="xl" @click="submitPassword">Masuk</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Clear History Dialog -->
     <v-dialog v-model="showClearDialog" max-width="360">
       <v-card rounded="xl">
         <v-card-text class="pa-6 text-center">
@@ -105,6 +146,7 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
   </div>
 </template>
 
@@ -112,13 +154,20 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useExamStore } from '../stores/exam'
+import { useQuestionsStore } from '../stores/questions'
 import { subjects, getSubjectById } from '../data/index'
+import { hasScriptUrl } from '../services/api'
+import { ADMIN_PASSWORD } from '../config'
+import { SESSION_KEY } from '../router/index'
 import SubjectCard from '../components/SubjectCard.vue'
 import HistoryList from '../components/HistoryList.vue'
 
 const router = useRouter()
 const store = useExamStore()
+const qStore = useQuestionsStore()
 const showClearDialog = ref(false)
+
+const sheetsConfigured = hasScriptUrl()
 
 const enrichedHistory = computed(() =>
   store.history.map(h => {
@@ -135,6 +184,52 @@ function startExam(subjectId) {
 function clearHistory() {
   store.clearHistory()
   showClearDialog.value = false
+}
+
+// ─── Password gate ────────────────────────────────────────────────────────
+const showPasswordDialog = ref(false)
+const passwordInput = ref('')
+const passwordError = ref('')
+const showPwd = ref(false)
+
+function closePasswordDialog() {
+  showPasswordDialog.value = false
+  passwordInput.value = ''
+  passwordError.value = ''
+  showPwd.value = false
+}
+
+function submitPassword() {
+  if (passwordInput.value === ADMIN_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, ADMIN_PASSWORD)
+    closePasswordDialog()
+    router.push({ name: 'admin' })
+  } else {
+    passwordError.value = 'Password salah. Coba lagi.'
+    passwordInput.value = ''
+  }
+}
+
+// ─── Sync soal dari Sheets ────────────────────────────────────────────────
+const syncing = ref(false)
+const syncMsg = ref('')
+
+async function syncSoal() {
+  syncing.value = true
+  syncMsg.value = ''
+  try {
+    const result = await qStore.fetchFromSheets()
+    if (result) {
+      syncMsg.value = `✅ Soal diperbarui dari Google Sheets (${result.count} mata pelajaran)`
+    } else if (qStore.error) {
+      syncMsg.value = `⚠️ Gagal: ${qStore.error}`
+    } else {
+      syncMsg.value = 'ℹ️ Sheets kosong, menggunakan soal default'
+    }
+  } finally {
+    syncing.value = false
+    setTimeout(() => { syncMsg.value = '' }, 4000)
+  }
 }
 </script>
 
