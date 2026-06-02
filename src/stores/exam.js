@@ -5,6 +5,7 @@ import { useQuestionsStore } from './questions'
 import { saveScoreToSheet } from '../services/api'
 
 const STORAGE_KEY = 'ujian_sd_history'
+const SESSION_KEY = 'ujian_sd_exam_session'
 
 export const useExamStore = defineStore('exam', () => {
   // State
@@ -38,24 +39,61 @@ export const useExamStore = defineStore('exam', () => {
     return Math.max(...hist.map(h => h.score))
   }
 
+  // ─── Session persistence (bertahan saat refresh) ─────────────────────────
+  function saveSession() {
+    if (!currentSubjectId.value) return
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+      subjectId: currentSubjectId.value,
+      questionIndex: currentQuestionIndex.value,
+      answers: answers.value,
+    }))
+  }
+
+  function clearSession() {
+    sessionStorage.removeItem(SESSION_KEY)
+  }
+
+  function restoreSession(subjectId) {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY)
+      if (!raw) return false
+      const data = JSON.parse(raw)
+      if (data.subjectId !== subjectId) return false
+      const qStore = useQuestionsStore()
+      const qs = qStore.getQuestions(subjectId)
+      if (!qs.length) return false
+      currentSubjectId.value = subjectId
+      currentQuestions.value = [...qs]
+      currentQuestionIndex.value = data.questionIndex ?? 0
+      answers.value = data.answers ?? {}
+      return true
+    } catch {
+      return false
+    }
+  }
+
   // Actions
   function startExam(subjectId) {
     const subject = getSubjectById(subjectId)
     if (!subject) return
+    clearSession()
     const qStore = useQuestionsStore()
     currentSubjectId.value = subjectId
     currentQuestions.value = [...qStore.getQuestions(subjectId)]
     currentQuestionIndex.value = 0
     answers.value = {}
+    saveSession()
   }
 
   function selectAnswer(optionIndex) {
     answers.value = { ...answers.value, [currentQuestionIndex.value]: optionIndex }
+    saveSession()
   }
 
   function goToQuestion(index) {
     if (index >= 0 && index < totalQuestions.value) {
       currentQuestionIndex.value = index
+      saveSession()
     }
   }
 
@@ -83,6 +121,7 @@ export const useExamStore = defineStore('exam', () => {
     history.value.push(record)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history.value))
     saveScoreToSheet(record) // fire-and-forget ke Google Sheets
+    clearSession()
     return record
   }
 
@@ -111,6 +150,8 @@ export const useExamStore = defineStore('exam', () => {
     getSubjectHistory,
     getBestScore,
     startExam,
+    restoreSession,
+    clearSession,
     selectAnswer,
     goToQuestion,
     prevQuestion,

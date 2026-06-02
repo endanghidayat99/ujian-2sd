@@ -198,9 +198,13 @@ const store = useExamStore()
 const showConfirm = ref(false)
 
 onMounted(() => {
-  // Guard: if no exam started, restart with param
   if (!store.currentSubjectId) {
-    store.startExam(route.params.subjectId)
+    // Refresh terdeteksi — coba restore jawaban yang sudah diisi
+    const restored = store.restoreSession(route.params.subjectId)
+    if (!restored) {
+      // Tidak ada sesi tersimpan, mulai ujian baru
+      store.startExam(route.params.subjectId)
+    }
   }
 })
 
